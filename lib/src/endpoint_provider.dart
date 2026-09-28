@@ -13,24 +13,32 @@ class EndpointRequestContext {
   final AppPlatform platform;
   final Uri endpoint;
   final EndpointRequestMethod method;
+  final AppEnvironment environment;
 
   const EndpointRequestContext({
     required this.appId,
     required this.platform,
     required this.endpoint,
     required this.method,
+    required this.environment,
   });
 }
 
 typedef EndpointPayloadBuilder =
     Map<String, dynamic> Function(String appId, AppPlatform platform);
+typedef EnvironmentEndpointPayloadBuilder =
+    Map<String, dynamic> Function(
+      String appId,
+      AppPlatform platform,
+      AppEnvironment environment,
+    );
 typedef EndpointRuleBuilder =
     VersionRule Function(
       Map<String, dynamic> json,
       EndpointRequestContext context,
     );
 
-class EndpointVersionRuleProvider implements VersionRuleProvider {
+class EndpointVersionRuleProvider implements EnvironmentVersionRuleProvider {
   final Uri endpoint;
   final EndpointRequestMethod method;
   final Map<String, String> headers;
@@ -38,6 +46,7 @@ class EndpointVersionRuleProvider implements VersionRuleProvider {
   final http.Client _client;
   final bool _ownsClient;
   final EndpointPayloadBuilder payloadBuilder;
+  final EnvironmentEndpointPayloadBuilder? environmentPayloadBuilder;
   final EndpointRuleBuilder ruleBuilder;
 
   EndpointVersionRuleProvider({
@@ -47,6 +56,7 @@ class EndpointVersionRuleProvider implements VersionRuleProvider {
     this.timeout = const Duration(seconds: 15),
     http.Client? client,
     EndpointPayloadBuilder? payloadBuilder,
+    this.environmentPayloadBuilder,
     EndpointRuleBuilder? ruleBuilder,
   }) : _client = client ?? http.Client(),
        _ownsClient = client == null,
@@ -54,16 +64,33 @@ class EndpointVersionRuleProvider implements VersionRuleProvider {
        ruleBuilder = ruleBuilder ?? _defaultRuleBuilder;
 
   @override
+  BackendService get backendService => BackendService.custom;
+
+  @override
   Future<VersionRule> fetchRule({
     required String appId,
     required AppPlatform platform,
+  }) => fetchRuleForEnvironment(
+    appId: appId,
+    platform: platform,
+    environment: AppEnvironment.production,
+  );
+
+  @override
+  Future<VersionRule> fetchRuleForEnvironment({
+    required String appId,
+    required AppPlatform platform,
+    required AppEnvironment environment,
   }) async {
-    final payload = payloadBuilder(appId, platform);
+    final payload =
+        environmentPayloadBuilder?.call(appId, platform, environment) ??
+        {...payloadBuilder(appId, platform), 'environment': environment.value};
     final context = EndpointRequestContext(
       appId: appId,
       platform: platform,
       endpoint: endpoint,
       method: method,
+      environment: environment,
     );
 
     final response = await _sendRequest(payload).timeout(timeout);

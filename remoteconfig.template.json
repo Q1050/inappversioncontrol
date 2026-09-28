@@ -1,0 +1,28 @@
+{
+  "parameters": {
+    "version_rule_android_production": {
+      "defaultValue": {
+        "value": "{\"minVersion\":\"1.0.0\",\"latestVersion\":\"1.2.0\",\"storeUrl\":\"https://example.com/store\",\"message\":\"Update available\",\"maintenance\":false,\"supportedPlatforms\":[\"android\",\"ios\"]}"
+      },
+      "description": "In-app version control rule for version_rule_android_production"
+    },
+    "version_rule_android_staging": {
+      "defaultValue": {
+        "value": "{\"minVersion\":\"1.0.0\",\"latestVersion\":\"1.2.0\",\"storeUrl\":\"https://example.com/store\",\"message\":\"Update available\",\"maintenance\":false,\"supportedPlatforms\":[\"android\",\"ios\"]}"
+      },
+      "description": "In-app version control rule for version_rule_android_staging"
+    },
+    "version_rule_android_testing": {
+      "defaultValue": {
+        "value": "{\"minVersion\":\"1.0.0\",\"latestVersion\":\"1.2.0\",\"storeUrl\":\"https://example.com/store\",\"message\":\"Update available\",\"maintenance\":false,\"supportedPlatforms\":[\"android\",\"ios\"]}"
+      },
+      "description": "In-app version control rule for version_rule_android_testing"
+    },
+    "version_rule_android_development": {
+      "defaultValue": {
+        "value": "{\"minVersion\":\"1.0.0\",\"latestVersion\":\"1.2.0\",\"storeUrl\":\"https://example.com/store\",\"message\":\"Update available\",\"maintenance\":false,\"supportedPlatforms\":[\"android\",\"ios\"]}"
+      },
+      "description": "In-app version control rule for version_rule_android_development"
+    }
+  }
+}

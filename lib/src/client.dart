@@ -4,15 +4,38 @@ import 'version_compare.dart';
 
 class InAppVersionControl {
   final VersionRuleProvider provider;
+  final AppEnvironment environment;
 
-  const InAppVersionControl({required this.provider});
+  const InAppVersionControl({
+    required this.provider,
+    this.environment = AppEnvironment.production,
+  });
+
+  BackendService get backendService => provider.backendService;
 
   Future<UpdateDecision> check({
     required String appId,
-    required AppPlatform platform,
+    AppPlatform? platform,
+    AppEnvironment? environment,
     required String currentVersion,
   }) async {
-    final rule = await provider.fetchRule(appId: appId, platform: platform);
+    final resolvedPlatform = platform ?? AppPlatform.current;
+    final resolvedEnvironment = environment ?? this.environment;
+    final rule = provider is EnvironmentVersionRuleProvider
+        ? await (provider as EnvironmentVersionRuleProvider)
+              .fetchRuleForEnvironment(
+                appId: appId,
+                platform: resolvedPlatform,
+                environment: resolvedEnvironment,
+              )
+        : await provider.fetchRule(appId: appId, platform: resolvedPlatform);
+
+    if (!rule.supportsPlatform(resolvedPlatform)) {
+      throw UnsupportedAppPlatformException(
+        platform: resolvedPlatform,
+        supportedPlatforms: rule.supportedPlatforms!,
+      );
+    }
 
     // Maintenance overrides everything, so if maintenance is true, we return that immediately
     if (rule.maintenance) {
@@ -50,6 +73,20 @@ class InAppVersionControl {
       currentVersion: currentVersion,
       minVersion: rule.minVersion,
       latestVersion: rule.latestVersion,
+    );
+  }
+
+  Future<UpdateDecision> checkForPlatform({
+    required String appId,
+    required AppPlatform platform,
+    AppEnvironment? environment,
+    required String currentVersion,
+  }) {
+    return check(
+      appId: appId,
+      platform: platform,
+      environment: environment,
+      currentVersion: currentVersion,
     );
   }
 }

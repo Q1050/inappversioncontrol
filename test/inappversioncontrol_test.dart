@@ -6,15 +6,48 @@ import 'package:in_app_version_control/in_app_version_control.dart';
 
 class FakeProvider implements VersionRuleProvider {
   final VersionRule rule;
+  final BackendService service;
+  AppPlatform? lastPlatform;
 
-  FakeProvider(this.rule);
+  FakeProvider(this.rule, {this.service = BackendService.custom});
+
+  @override
+  BackendService get backendService => service;
 
   @override
   Future<VersionRule> fetchRule({
     required String appId,
     required AppPlatform platform,
   }) async {
+    lastPlatform = platform;
     return rule;
+  }
+}
+
+class EnvironmentFakeProvider implements EnvironmentVersionRuleProvider {
+  AppEnvironment? lastEnvironment;
+
+  @override
+  BackendService get backendService => BackendService.custom;
+
+  @override
+  Future<VersionRule> fetchRule({
+    required String appId,
+    required AppPlatform platform,
+  }) => fetchRuleForEnvironment(
+    appId: appId,
+    platform: platform,
+    environment: AppEnvironment.production,
+  );
+
+  @override
+  Future<VersionRule> fetchRuleForEnvironment({
+    required String appId,
+    required AppPlatform platform,
+    required AppEnvironment environment,
+  }) async {
+    lastEnvironment = environment;
+    return const VersionRule(minVersion: '1.0.0', latestVersion: '1.0.0');
   }
 }
 
@@ -103,6 +136,82 @@ void main() {
 
   test('throws for invalid version strings', () {
     expect(() => compareVersions('1.0.0-beta', '1.0.0'), throwsFormatException);
+  });
+
+  test('exposes backend service from the provider', () {
+    final provider = FakeProvider(
+      const VersionRule(minVersion: '1.0.0', latestVersion: '1.2.0'),
+      service: BackendService.firebase,
+    );
+
+    final versionControl = InAppVersionControl(provider: provider);
+
+    expect(versionControl.backendService, BackendService.firebase);
+  });
+
+  test('defaults to the current platform when none is passed', () async {
+    final provider = FakeProvider(
+      const VersionRule(minVersion: '1.0.0', latestVersion: '1.2.0'),
+    );
+
+    await InAppVersionControl(
+      provider: provider,
+    ).check(appId: 'com.example.app', currentVersion: '1.2.0');
+
+    expect(provider.lastPlatform, AppPlatform.current);
+  });
+
+  test(
+    'uses production by default and allows an environment override',
+    () async {
+      final provider = EnvironmentFakeProvider();
+      final versionControl = InAppVersionControl(provider: provider);
+
+      await versionControl.check(
+        appId: 'com.example.app',
+        platform: AppPlatform.android,
+        currentVersion: '1.0.0',
+      );
+      expect(provider.lastEnvironment, AppEnvironment.production);
+
+      await versionControl.check(
+        appId: 'com.example.app',
+        platform: AppPlatform.android,
+        environment: AppEnvironment.development,
+        currentVersion: '1.0.0',
+      );
+      expect(provider.lastEnvironment, AppEnvironment.development);
+    },
+  );
+
+  test('throws when the rule disallows the requested platform', () async {
+    final versionControl = InAppVersionControl(
+      provider: FakeProvider(
+        const VersionRule(
+          minVersion: '1.0.0',
+          latestVersion: '1.2.0',
+          supportedPlatforms: {AppPlatform.ios},
+        ),
+      ),
+    );
+
+    expect(
+      () => versionControl.check(
+        appId: 'com.example.app',
+        platform: AppPlatform.android,
+        currentVersion: '1.0.0',
+      ),
+      throwsA(isA<UnsupportedAppPlatformException>()),
+    );
+  });
+
+  test('endpoint provider identifies itself as a custom backend', () {
+    final provider = EndpointVersionRuleProvider(
+      endpoint: Uri.parse('https://example.com/rule'),
+    );
+    addTearDown(provider.close);
+
+    expect(provider.backendService, BackendService.custom);
   });
 
   test(
