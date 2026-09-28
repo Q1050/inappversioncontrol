@@ -11,6 +11,59 @@ or enter maintenance mode.
 - Built-in endpoint provider for teams that already expose their own backend API
 - Enum-backed backend source selection through provider types
 
+## Install in a Flutter project
+
+Until the package is published on pub.dev, add it directly from GitHub in the
+consuming app's `pubspec.yaml`:
+
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  in_app_version_control:
+    git:
+      url: https://github.com/Q1050/inappversioncontrol.git
+      ref: main
+```
+
+Install the dependency:
+
+```bash
+flutter pub get
+```
+
+Import the public package API wherever version checks are needed:
+
+```dart
+import 'package:in_app_version_control/in_app_version_control.dart';
+```
+
+For Firebase Remote Config, also add Firebase Core and configure Firebase for
+the consuming app. Firebase configuration files are intentionally not included
+in this repository because every app must use its own Firebase project.
+
+```bash
+flutter pub add firebase_core
+dart pub global activate flutterfire_cli
+flutterfire configure
+```
+
+Initialize Firebase before creating a `FirebaseVersionRuleProvider`:
+
+```dart
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/widgets.dart';
+import 'firebase_options.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(const MyApp());
+}
+```
+
 ## Getting started
 
 Create a `VersionRuleProvider`, pass it to `InAppVersionControl`, and call
