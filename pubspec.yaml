@@ -2,7 +2,7 @@ name: in_app_version_control
 description: "A Flutter/Dart package to check remote app-version rules (optional update, forced update, maintenance) and enforce update behavior in-app."
 version: 0.0.1
 homepage:
-repository: https://github.com/Astrobotical/inappversioncontrol
+repository: https://github.com/Q1050/inappversioncontrol
 
 executables:
   iavc:
