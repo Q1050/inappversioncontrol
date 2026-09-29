@@ -85,6 +85,22 @@ void main() {
           await tempDir.delete(recursive: true);
         }
       });
+      await File('${tempDir.path}/firebase.json').writeAsString(
+        jsonEncode({
+          'flutter': {
+            'platforms': {
+              'android': {
+                'default': {'projectId': 'demo-project'},
+              },
+            },
+          },
+        }),
+      );
+      final androidAppDirectory = Directory('${tempDir.path}/android/app');
+      await androidAppDirectory.create(recursive: true);
+      await File(
+        '${androidAppDirectory.path}/build.gradle.kts',
+      ).writeAsString('applicationId = "com.example.app"');
 
       final out = StringBuffer();
       final err = StringBuffer();
@@ -158,10 +174,6 @@ void main() {
         [
           'app:firebase',
           'configure',
-          '--project',
-          'demo-project',
-          '--android-package',
-          'com.example.app',
           '--write-alias',
           'default',
           '--out-dir',

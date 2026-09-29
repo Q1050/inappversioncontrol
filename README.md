@@ -338,3 +338,10 @@ dart run in_app_version_control:iavc app:firebase configure --project your-proje
 dart run in_app_version_control:iavc app:supabase configure --table app_version_rules
 dart run in_app_version_control:iavc app:custom configure --method post
 ```
+
+When run from a configured Flutter project, `app:firebase configure`
+automatically reads the Firebase project ID from `.firebaserc` or a
+FlutterFire-generated `firebase.json`. It also reads the Android package name
+from `android/app/build.gradle.kts` or `android/app/build.gradle`. Use
+`--project` or `--android-package` only when detection is unavailable or you
+want to override it.

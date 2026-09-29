@@ -174,6 +174,7 @@ Future<int> _handleFirebaseConfigure(
   final resolvedProject =
       requestedProject ??
       _readDefaultFirebaseProject(context.workingDirectory) ??
+      _readFlutterFireProject(context.workingDirectory) ??
       (projects.length == 1 ? projects.single.id : null);
 
   if (resolvedProject == null) {
@@ -197,8 +198,19 @@ Future<int> _handleFirebaseConfigure(
 
   var apps = await firebase.listApps(resolvedProject);
 
-  final androidPackage = options.singleValue('android-package');
-  if (androidPackage != null && !apps.any((app) => app.platform == 'ANDROID')) {
+  final androidPackage =
+      options.singleValue('android-package') ??
+      _readAndroidPackage(context.workingDirectory);
+  final androidApps = apps.where((app) => app.platform == 'ANDROID').toList();
+  final hasMatchingAndroidApp =
+      androidPackage != null &&
+      androidApps.any((app) => app.namespace == androidPackage);
+  final androidNamespacesUnavailable =
+      androidApps.isNotEmpty &&
+      androidApps.every((app) => app.namespace == null);
+  if (androidPackage != null &&
+      !hasMatchingAndroidApp &&
+      !androidNamespacesUnavailable) {
     await firebase.createAndroidApp(
       projectId: resolvedProject,
       packageName: androidPackage,
@@ -608,6 +620,7 @@ class _FirebaseCli {
           (item) => _FirebaseApp(
             platform: (item['platform'] as String).toUpperCase(),
             appId: item['appId'] as String?,
+            namespace: item['namespace'] as String?,
             displayName:
                 item['displayName'] as String? ??
                 item['name'] as String? ??
@@ -709,13 +722,35 @@ class _FirebaseProject {
 class _FirebaseApp {
   final String platform;
   final String? appId;
+  final String? namespace;
   final String displayName;
 
   const _FirebaseApp({
     required this.platform,
     required this.appId,
+    required this.namespace,
     required this.displayName,
   });
+}
+
+String? _readAndroidPackage(String workingDirectory) {
+  final candidates = [
+    File('$workingDirectory/android/app/build.gradle.kts'),
+    File('$workingDirectory/android/app/build.gradle'),
+  ];
+
+  for (final file in candidates) {
+    if (!file.existsSync()) {
+      continue;
+    }
+    final match = RegExp(
+      r'''applicationId\s*(?:=\s*)?["']([^"']+)["']''',
+    ).firstMatch(file.readAsStringSync());
+    if (match != null) {
+      return match.group(1);
+    }
+  }
+  return null;
 }
 
 String? _readDefaultFirebaseProject(String workingDirectory) {
@@ -736,6 +771,38 @@ String? _readDefaultFirebaseProject(String workingDirectory) {
     return null;
   }
   return null;
+}
+
+String? _readFlutterFireProject(String workingDirectory) {
+  final file = File('$workingDirectory/firebase.json');
+  if (!file.existsSync()) {
+    return null;
+  }
+
+  try {
+    final projectIds = <String>{};
+
+    void collectProjectIds(Object? value) {
+      if (value is Map<String, dynamic>) {
+        final projectId = value['projectId'];
+        if (projectId is String && projectId.isNotEmpty) {
+          projectIds.add(projectId);
+        }
+        for (final child in value.values) {
+          collectProjectIds(child);
+        }
+      } else if (value is List) {
+        for (final child in value) {
+          collectProjectIds(child);
+        }
+      }
+    }
+
+    collectProjectIds(jsonDecode(file.readAsStringSync()));
+    return projectIds.length == 1 ? projectIds.single : null;
+  } on Object {
+    return null;
+  }
 }
 
 Map<AppEnvironment, Map<AppPlatform, String>> _buildRemoteConfigKeys(
