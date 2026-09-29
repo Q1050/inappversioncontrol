@@ -13,23 +13,33 @@ or enter maintenance mode.
 
 ## Install in a Flutter project
 
-Until the package is published on pub.dev, add it directly from GitHub in the
-consuming app's `pubspec.yaml`:
+Install the latest published version from pub.dev:
+
+```bash
+flutter pub add in_app_version_control
+```
+
+Or add the dependency to the consuming app's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter:
-    sdk: flutter
+  in_app_version_control: ^0.0.1
+```
+
+Then install dependencies:
+
+```bash
+flutter pub get
+```
+
+To test unreleased development changes instead, use the GitHub repository:
+
+```yaml
+dependencies:
   in_app_version_control:
     git:
       url: https://github.com/Q1050/inappversioncontrol.git
       ref: main
-```
-
-Install the dependency:
-
-```bash
-flutter pub get
 ```
 
 Import the public package API wherever version checks are needed:
