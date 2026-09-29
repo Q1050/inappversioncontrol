@@ -1,6 +1,6 @@
 import 'models.dart';
 
-/// A backend adapter (Firebase, Supabase, REST, etc.)
+/// A backend adapter (Firebase, REST, etc.)
 abstract class VersionRuleProvider {
   BackendService get backendService;
 

@@ -2,7 +2,7 @@ import 'platform/current_app_platform.dart';
 
 enum UpdateType { none, optional, force, maintenance }
 
-enum BackendService { firebase, supabase, custom }
+enum BackendService { firebase, custom }
 
 enum AppEnvironment {
   production('production'),

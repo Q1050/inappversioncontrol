@@ -1,14 +1,9 @@
 import 'dart:convert';
 
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:in_app_version_control/in_app_version_control.dart';
 
-import 'firebase_options.dart';
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+void main() {
   runApp(const VersionControlExampleApp());
 }
 
@@ -45,22 +40,6 @@ class _VersionControlExamplePageState extends State<VersionControlExamplePage> {
     return InAppVersionControl(
       provider: switch (_providerMode) {
         _ProviderMode.memory => DemoProvider(_scenario.rule),
-        _ProviderMode.firebaseLive => FirebaseVersionRuleProvider.remoteConfig(
-          environmentKeys: const {
-            AppEnvironment.production: {
-              AppPlatform.android: 'version_rule_android_production',
-            },
-            AppEnvironment.staging: {
-              AppPlatform.android: 'version_rule_android_staging',
-            },
-            AppEnvironment.testing: {
-              AppPlatform.android: 'version_rule_android_testing',
-            },
-            AppEnvironment.development: {
-              AppPlatform.android: 'version_rule_android_development',
-            },
-          },
-        ),
         _ProviderMode.firebaseMock =>
           FirebaseVersionRuleProvider.remoteConfigClient(
             remoteConfigClient: _ExampleFirebaseRemoteConfigClient(
@@ -144,13 +123,6 @@ class _VersionControlExamplePageState extends State<VersionControlExamplePage> {
                 const Text(
                   'This uses the real FirebaseVersionRuleProvider API with a '
                   'mocked Remote Config client so you can test the Firebase flow locally.',
-                ),
-              ],
-              if (_providerMode == _ProviderMode.firebaseLive) ...[
-                const SizedBox(height: 8),
-                const Text(
-                  'This fetches the selected Android environment rule from '
-                  'the live Firebase Remote Config project.',
                 ),
               ],
               const SizedBox(height: 24),
@@ -483,7 +455,6 @@ enum _Scenario {
 
 enum _ProviderMode {
   memory(label: 'In-memory provider'),
-  firebaseLive(label: 'Firebase Remote Config (live)'),
   firebaseMock(label: 'Firebase Remote Config (mock)');
 
   final String label;

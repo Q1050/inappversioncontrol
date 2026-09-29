@@ -15,10 +15,8 @@ It demonstrates:
 - `UpdateType.force`
 - `UpdateType.maintenance`
 - in-memory provider flow
-- live Firebase Remote Config flow
 - Firebase Remote Config provider flow with a mocked Remote Config client
 
-The live Firebase mode is configured for the Android app `com.example.app` in
-the `chatapp-c5dfa` Firebase project. It reads separate production, staging,
-testing, and development rules. The mock mode remains available for changing
-decision scenarios locally without modifying Remote Config.
+The example uses the real `FirebaseVersionRuleProvider` API with a local mock
+client, so it runs without Firebase credentials. Follow the package README to
+connect a consuming application to its own Firebase project.
