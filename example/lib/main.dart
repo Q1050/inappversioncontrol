@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -35,6 +36,44 @@ class _VersionControlExamplePageState extends State<VersionControlExamplePage> {
   AppPlatform _platform = AppPlatform.android;
   AppEnvironment _environment = AppEnvironment.production;
   _ProviderMode _providerMode = _ProviderMode.memory;
+  late VersionControlLifecycle _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = _buildLifecycle();
+    _lifecycle.addListener(_handleLifecycleUpdate);
+    unawaited(_lifecycle.start());
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  void _handleLifecycleUpdate() {
+    if (mounted) setState(() {});
+  }
+
+  VersionControlLifecycle _buildLifecycle() {
+    return VersionControlLifecycle(
+      versionControl: _buildVersionControl(),
+      appId: 'com.example.myapp',
+      platform: _platform,
+      environment: _environment,
+      currentVersion: _scenario.currentVersion,
+    );
+  }
+
+  void _restartLifecycle() {
+    _lifecycle
+      ..removeListener(_handleLifecycleUpdate)
+      ..dispose();
+    _lifecycle = _buildLifecycle();
+    _lifecycle.addListener(_handleLifecycleUpdate);
+    unawaited(_lifecycle.start());
+  }
 
   InAppVersionControl _buildVersionControl() {
     return InAppVersionControl(
@@ -66,158 +105,144 @@ class _VersionControlExamplePageState extends State<VersionControlExamplePage> {
     );
   }
 
-  Future<UpdateDecision> _runCheck() {
-    final versionControl = _buildVersionControl();
-    return versionControl.check(
-      appId: 'com.example.myapp',
-      platform: _platform,
-      environment: _environment,
-      currentVersion: _scenario.currentVersion,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final decision = _lifecycle.decision;
+    final versionControl = _lifecycle.versionControl;
+
     return Scaffold(
       appBar: AppBar(title: const Text('In App Version Control')),
-      body: FutureBuilder<UpdateDecision>(
-        future: _runCheck(),
-        builder: (context, snapshot) {
-          final decision = snapshot.data;
-          final versionControl = _buildVersionControl();
-
-          return ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              const Text(
-                'Provider',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<_ProviderMode>(
-                initialValue: _providerMode,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Backend integration',
-                ),
-                items: _ProviderMode.values.map((mode) {
-                  return DropdownMenuItem<_ProviderMode>(
-                    value: mode,
-                    child: Text(mode.label),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() {
-                    _providerMode = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-              _InfoTile(
-                title: 'Backend service',
-                value: versionControl.backendService.name,
-              ),
-              if (_providerMode == _ProviderMode.firebaseMock) ...[
-                const SizedBox(height: 8),
-                const Text(
-                  'This uses the real FirebaseVersionRuleProvider API with a '
-                  'mocked Remote Config client so you can test the Firebase flow locally.',
-                ),
-              ],
-              const SizedBox(height: 24),
-              const Text(
-                'Scenario',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<_Scenario>(
-                initialValue: _scenario,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Decision scenario',
-                ),
-                items: _Scenario.values.map((scenario) {
-                  return DropdownMenuItem<_Scenario>(
-                    value: scenario,
-                    child: Text(scenario.label),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() {
-                    _scenario = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<AppEnvironment>(
-                initialValue: _environment,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'App environment',
-                ),
-                items: AppEnvironment.values.map((environment) {
-                  return DropdownMenuItem<AppEnvironment>(
-                    value: environment,
-                    child: Text(environment.value),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() {
-                    _environment = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<AppPlatform>(
-                initialValue: _platform,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'App platform',
-                ),
-                items: AppPlatform.values.map((platform) {
-                  return DropdownMenuItem<AppPlatform>(
-                    value: platform,
-                    child: Text(platform.value),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() {
-                    _platform = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 24),
-              _InfoTile(
-                title: 'Current version',
-                value: _scenario.currentVersion,
-              ),
-              _InfoTile(
-                title: 'Minimum supported version',
-                value: _scenario.rule.minVersion,
-              ),
-              _InfoTile(
-                title: 'Latest available version',
-                value: _scenario.rule.latestVersion,
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Decision',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 12),
-              if (snapshot.hasError)
-                _ErrorCard(error: snapshot.error!)
-              else if (!snapshot.hasData)
-                const Center(child: CircularProgressIndicator())
-              else
-                _DecisionCard(decision: decision!),
-            ],
-          );
-        },
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          const Text(
+            'Provider',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<_ProviderMode>(
+            initialValue: _providerMode,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'Backend integration',
+            ),
+            items: _ProviderMode.values.map((mode) {
+              return DropdownMenuItem<_ProviderMode>(
+                value: mode,
+                child: Text(mode.label),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() {
+                _providerMode = value;
+              });
+              _restartLifecycle();
+            },
+          ),
+          const SizedBox(height: 12),
+          _InfoTile(
+            title: 'Backend service',
+            value: versionControl.backendService.name,
+          ),
+          if (_providerMode == _ProviderMode.firebaseMock) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'This uses the real FirebaseVersionRuleProvider API with a '
+              'mocked Remote Config client so you can test the Firebase flow locally.',
+            ),
+          ],
+          const SizedBox(height: 24),
+          const Text(
+            'Scenario',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<_Scenario>(
+            initialValue: _scenario,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'Decision scenario',
+            ),
+            items: _Scenario.values.map((scenario) {
+              return DropdownMenuItem<_Scenario>(
+                value: scenario,
+                child: Text(scenario.label),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() {
+                _scenario = value;
+              });
+              _restartLifecycle();
+            },
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<AppEnvironment>(
+            initialValue: _environment,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'App environment',
+            ),
+            items: AppEnvironment.values.map((environment) {
+              return DropdownMenuItem<AppEnvironment>(
+                value: environment,
+                child: Text(environment.value),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() {
+                _environment = value;
+              });
+              _restartLifecycle();
+            },
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<AppPlatform>(
+            initialValue: _platform,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'App platform',
+            ),
+            items: AppPlatform.values.map((platform) {
+              return DropdownMenuItem<AppPlatform>(
+                value: platform,
+                child: Text(platform.value),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() {
+                _platform = value;
+              });
+              _restartLifecycle();
+            },
+          ),
+          const SizedBox(height: 24),
+          _InfoTile(title: 'Current version', value: _scenario.currentVersion),
+          _InfoTile(
+            title: 'Minimum supported version',
+            value: _scenario.rule.minVersion,
+          ),
+          _InfoTile(
+            title: 'Latest available version',
+            value: _scenario.rule.latestVersion,
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Decision',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          if (_lifecycle.error != null && decision == null)
+            _ErrorCard(error: _lifecycle.error!)
+          else if (decision == null)
+            const Center(child: CircularProgressIndicator())
+          else
+            _DecisionCard(decision: decision),
+        ],
       ),
     );
   }

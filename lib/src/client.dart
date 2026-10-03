@@ -2,17 +2,27 @@ import 'models.dart';
 import 'provider.dart';
 import 'version_compare.dart';
 
+/// Checks an app's current version against rules supplied by a backend.
 class InAppVersionControl {
+  /// The backend used to load version rules.
   final VersionRuleProvider provider;
+
+  /// The environment used when a check does not provide one.
   final AppEnvironment environment;
 
+  /// Creates a version checker backed by [provider].
   const InAppVersionControl({
     required this.provider,
     this.environment = AppEnvironment.production,
   });
 
+  /// Identifies the backend used by this checker.
   BackendService get backendService => provider.backendService;
 
+  /// Loads the matching rule and decides whether the app can continue.
+  ///
+  /// When [platform] is omitted, the current Flutter platform is used. When
+  /// [environment] is omitted, this checker's default [environment] is used.
   Future<UpdateDecision> check({
     required String appId,
     AppPlatform? platform,
@@ -76,6 +86,9 @@ class InAppVersionControl {
     );
   }
 
+  /// Checks a rule for an explicitly selected [platform].
+  ///
+  /// This is a convenience wrapper around [check].
   Future<UpdateDecision> checkForPlatform({
     required String appId,
     required AppPlatform platform,

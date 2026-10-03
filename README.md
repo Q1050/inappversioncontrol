@@ -23,23 +23,13 @@ Or add the dependency to the consuming app's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  in_app_version_control: ^0.0.1
+  in_app_version_control: ^0.0.4
 ```
 
 Then install dependencies:
 
 ```bash
 flutter pub get
-```
-
-To test unreleased development changes instead, use the GitHub repository:
-
-```yaml
-dependencies:
-  in_app_version_control:
-    git:
-      url: https://github.com/Q1050/inappversioncontrol.git
-      ref: main
 ```
 
 Import the public package API wherever version checks are needed:
@@ -144,6 +134,54 @@ final decision = await versionControl.check(
   currentVersion: '1.5.0',
 );
 ```
+
+### Recheck after the app resumes
+
+Lifecycle-aware checking is opt-in. Create a `VersionControlLifecycle`, start
+it once from the owning component, listen for state changes, and dispose it
+with that component:
+
+```dart
+late final VersionControlLifecycle lifecycle;
+
+@override
+void initState() {
+  super.initState();
+  lifecycle = VersionControlLifecycle(
+    versionControl: versionControl,
+    appId: 'com.example.app',
+    currentVersion: '1.1.0',
+  )..addListener(_handlePolicyChange);
+  lifecycle.start();
+}
+
+void _handlePolicyChange() {
+  final decision = lifecycle.decision;
+  final error = lifecycle.error;
+  // Update your dialog, route, or blocking UI from this state.
+}
+
+@override
+void dispose() {
+  lifecycle.dispose();
+  super.dispose();
+}
+```
+
+By default, the coordinator checks once on `start()`, then checks once after
+each genuine foreground departure followed by `AppLifecycleState.resumed`.
+The initial `resumed` event, repeated `resumed` events, temporary `inactive`
+events, and widget rebuilds do not trigger checks. Set `checkInitially` or
+`checkOnResume` to `false` to disable either behavior.
+
+Checks never overlap. If a resume occurs during a check, duplicate requests
+are coalesced into one pending check. A refresh failure is exposed through
+`error`, while the last successful `decision` remains available so a known
+force-update or maintenance state is not accidentally removed. A cold-start
+failure has an error and no decision.
+
+The lifecycle coordinator requests evaluations only. It does not poll, run in
+the background, or override provider caching and minimum-fetch intervals.
 
 ### 2. Use the built-in endpoint provider
 

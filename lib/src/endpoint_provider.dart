@@ -6,15 +6,27 @@ import 'package:http/http.dart' as http;
 import 'models.dart';
 import 'provider.dart';
 
+/// HTTP methods supported by [EndpointVersionRuleProvider].
 enum EndpointRequestMethod { get, post, put, patch }
 
+/// Information about the request being mapped into a version rule.
 class EndpointRequestContext {
+  /// The application identifier sent with the request.
   final String appId;
+
+  /// The platform being checked.
   final AppPlatform platform;
+
+  /// The endpoint that received the request.
   final Uri endpoint;
+
+  /// The HTTP method used for the request.
   final EndpointRequestMethod method;
+
+  /// The deployment environment being checked.
   final AppEnvironment environment;
 
+  /// Creates context for a custom endpoint rule builder.
   const EndpointRequestContext({
     required this.appId,
     required this.platform,
@@ -24,31 +36,55 @@ class EndpointRequestContext {
   });
 }
 
+/// Builds a request payload for an app and platform.
 typedef EndpointPayloadBuilder =
     Map<String, dynamic> Function(String appId, AppPlatform platform);
+
+/// Builds a request payload that also includes the deployment environment.
 typedef EnvironmentEndpointPayloadBuilder =
     Map<String, dynamic> Function(
       String appId,
       AppPlatform platform,
       AppEnvironment environment,
     );
+
+/// Converts a custom endpoint response into a [VersionRule].
 typedef EndpointRuleBuilder =
     VersionRule Function(
       Map<String, dynamic> json,
       EndpointRequestContext context,
     );
 
+/// Loads version rules from a custom HTTP endpoint.
+///
+/// By default, requests include `appId`, `platform`, and `environment`, and the
+/// response is parsed with [VersionRule.fromJson]. Builders can adapt those
+/// defaults to an existing backend contract.
 class EndpointVersionRuleProvider implements EnvironmentVersionRuleProvider {
+  /// The backend URL used to load version rules.
   final Uri endpoint;
+
+  /// The HTTP method used for requests.
   final EndpointRequestMethod method;
+
+  /// Headers added to every request.
   final Map<String, String> headers;
+
+  /// How long a request may run before timing out.
   final Duration timeout;
   final http.Client _client;
   final bool _ownsClient;
+
+  /// Builds a request payload when no environment-specific builder is set.
   final EndpointPayloadBuilder payloadBuilder;
+
+  /// Optionally builds a payload with the selected environment.
   final EnvironmentEndpointPayloadBuilder? environmentPayloadBuilder;
+
+  /// Converts a successful JSON response into a version rule.
   final EndpointRuleBuilder ruleBuilder;
 
+  /// Creates a provider for a custom backend endpoint.
   EndpointVersionRuleProvider({
     required this.endpoint,
     this.method = EndpointRequestMethod.get,
@@ -167,6 +203,9 @@ class EndpointVersionRuleProvider implements EnvironmentVersionRuleProvider {
     });
   }
 
+  /// Closes the HTTP client created by this provider.
+  ///
+  /// A client supplied through the constructor remains owned by the caller.
   void close() {
     if (_ownsClient) {
       _client.close();
@@ -194,9 +233,12 @@ class EndpointVersionRuleProvider implements EnvironmentVersionRuleProvider {
   }
 }
 
+/// Thrown when a custom endpoint cannot return a usable version rule.
 class EndpointVersionRuleException implements Exception {
+  /// A description of the endpoint failure.
   final String message;
 
+  /// Creates an endpoint exception with [message].
   const EndpointVersionRuleException(this.message);
 
   @override

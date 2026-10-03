@@ -1,19 +1,27 @@
 import 'platform/current_app_platform.dart';
 
+/// The action an app should take after checking its version policy.
 enum UpdateType { none, optional, force, maintenance }
 
+/// A backend service supported by a version-rule provider.
 enum BackendService { firebase, supabase, custom }
 
+/// The deployment environment used to select a version rule.
 enum AppEnvironment {
   production('production'),
   staging('staging'),
   testing('testing'),
   development('development');
 
+  /// The value used when sending this environment to a backend.
   final String value;
 
+  /// Creates an environment with its backend [value].
   const AppEnvironment(this.value);
 
+  /// Finds the environment represented by [value].
+  ///
+  /// Throws an [ArgumentError] when the value is not supported.
   static AppEnvironment fromValue(String value) {
     return AppEnvironment.values.firstWhere(
       (environment) => environment.value == value,
@@ -26,6 +34,7 @@ enum AppEnvironment {
   }
 }
 
+/// A platform that can have its own version policy and store URL.
 enum AppPlatform {
   android('android'),
   ios('ios'),
@@ -34,12 +43,18 @@ enum AppPlatform {
   windows('windows'),
   linux('linux');
 
+  /// The value used when sending this platform to a backend.
   final String value;
 
+  /// Creates a platform with its backend [value].
   const AppPlatform(this.value);
 
+  /// The platform on which the Flutter app is currently running.
   static AppPlatform get current => currentAppPlatform();
 
+  /// Finds the platform represented by [value].
+  ///
+  /// Throws an [ArgumentError] when the value is not supported.
   static AppPlatform fromValue(String value) {
     return AppPlatform.values.firstWhere(
       (platform) => platform.value == value,
@@ -52,14 +67,27 @@ enum AppPlatform {
   }
 }
 
+/// A backend policy describing supported app versions.
 class VersionRule {
+  /// The oldest version allowed to continue using the app.
   final String minVersion;
+
+  /// The newest version currently available to users.
   final String latestVersion;
+
+  /// The store page where users can update the app.
   final String? storeUrl;
+
+  /// An optional message to show with the decision.
   final String? message;
+
+  /// Whether the app should be unavailable for maintenance.
   final bool maintenance;
+
+  /// Platforms allowed by this rule, or `null` to allow every platform.
   final Set<AppPlatform>? supportedPlatforms;
 
+  /// Creates a version rule returned by a backend.
   const VersionRule({
     required this.minVersion,
     required this.latestVersion,
@@ -69,6 +97,7 @@ class VersionRule {
     this.supportedPlatforms,
   });
 
+  /// Creates a version rule from the package's standard JSON format.
   factory VersionRule.fromJson(Map<String, dynamic> json) {
     return VersionRule(
       minVersion: json['minVersion'] as String,
@@ -82,6 +111,7 @@ class VersionRule {
     );
   }
 
+  /// Converts this rule to the package's standard JSON format.
   Map<String, dynamic> toJson() {
     return {
       'minVersion': minVersion,
@@ -95,6 +125,7 @@ class VersionRule {
     };
   }
 
+  /// Returns whether this rule allows [platform].
   bool supportsPlatform(AppPlatform platform) {
     return supportedPlatforms == null || supportedPlatforms!.contains(platform);
   }
@@ -111,12 +142,24 @@ class VersionRule {
   }
 }
 
+/// The result of comparing an installed app version with a [VersionRule].
 class UpdateDecision {
+  /// The action the app should take.
   final UpdateType type;
+
+  /// The version currently installed on the device.
   final String currentVersion;
+
+  /// The oldest version allowed by the rule.
   final String minVersion;
+
+  /// The newest version available according to the rule.
   final String latestVersion;
+
+  /// The store page where the user can update the app.
   final String? storeUrl;
+
+  /// An optional message suitable for the app's update or maintenance UI.
   final String? message;
 
   const UpdateDecision._({
@@ -128,6 +171,7 @@ class UpdateDecision {
     this.message,
   });
 
+  /// Creates a decision that allows the app to continue normally.
   factory UpdateDecision.none({
     required String currentVersion,
     required String minVersion,
@@ -139,6 +183,7 @@ class UpdateDecision {
     latestVersion: latestVersion,
   );
 
+  /// Creates a decision that offers an update without requiring it.
   factory UpdateDecision.optional({
     required String currentVersion,
     required String minVersion,
@@ -154,6 +199,7 @@ class UpdateDecision {
     message: message,
   );
 
+  /// Creates a decision that requires an update before continuing.
   factory UpdateDecision.force({
     required String currentVersion,
     required String minVersion,
@@ -169,6 +215,7 @@ class UpdateDecision {
     message: message,
   );
 
+  /// Creates a decision that marks the app as unavailable for maintenance.
   factory UpdateDecision.maintenance({
     required String currentVersion,
     required String minVersion,
@@ -182,13 +229,19 @@ class UpdateDecision {
     message: message,
   );
 
+  /// Whether the app should show update or maintenance UI.
   bool get requiresAction => type != UpdateType.none;
 }
 
+/// Thrown when a version rule does not allow the requested platform.
 class UnsupportedAppPlatformException implements Exception {
+  /// The platform that was rejected.
   final AppPlatform platform;
+
+  /// The platforms allowed by the rule.
   final Set<AppPlatform> supportedPlatforms;
 
+  /// Creates an unsupported-platform exception.
   const UnsupportedAppPlatformException({
     required this.platform,
     required this.supportedPlatforms,

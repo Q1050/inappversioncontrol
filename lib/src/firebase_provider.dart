@@ -5,13 +5,23 @@ import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'models.dart';
 import 'provider.dart';
 
+/// Loads version rules from Firebase Remote Config.
 class FirebaseVersionRuleProvider implements EnvironmentVersionRuleProvider {
   final FirebaseRemoteConfigClient _remoteConfig;
+
+  /// Remote Config keys selected by platform.
   final Map<AppPlatform, String> keys;
+
+  /// Remote Config keys selected by environment and platform.
   final Map<AppEnvironment, Map<AppPlatform, String>> environmentKeys;
+
+  /// The fallback key used when no environment or platform key matches.
   final String? defaultKey;
+
+  /// Whether Remote Config should fetch and activate before reading a value.
   final bool shouldFetchAndActivate;
 
+  /// Creates a provider using the Firebase Remote Config plugin.
   FirebaseVersionRuleProvider.remoteConfig({
     FirebaseRemoteConfig? remoteConfig,
     Map<AppPlatform, String> keys = const {},
@@ -28,6 +38,9 @@ class FirebaseVersionRuleProvider implements EnvironmentVersionRuleProvider {
          remoteConfig ?? FirebaseRemoteConfig.instance,
        );
 
+  /// Creates a provider using a custom Remote Config client.
+  ///
+  /// This constructor is useful for tests or custom Firebase wrappers.
   FirebaseVersionRuleProvider.remoteConfigClient({
     required FirebaseRemoteConfigClient remoteConfigClient,
     Map<AppPlatform, String> keys = const {},
@@ -108,18 +121,24 @@ Map<AppEnvironment, Map<AppPlatform, String>> _freezeEnvironmentKeys(
   ),
 );
 
+/// Thrown when Firebase does not contain a usable version rule.
 class FirebaseVersionRuleException implements Exception {
+  /// A description of the Firebase configuration or parsing failure.
   final String message;
 
+  /// Creates a Firebase version-rule exception with [message].
   const FirebaseVersionRuleException(this.message);
 
   @override
   String toString() => 'FirebaseVersionRuleException: $message';
 }
 
+/// The Remote Config operations required by [FirebaseVersionRuleProvider].
 abstract class FirebaseRemoteConfigClient {
+  /// Fetches the latest Remote Config values and activates them.
   Future<bool> fetchAndActivate();
 
+  /// Returns the string stored under [key].
   String getString(String key);
 }
 

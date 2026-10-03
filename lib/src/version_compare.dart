@@ -1,3 +1,8 @@
+/// Compares two dot-separated numeric version strings.
+///
+/// Returns a negative number when [a] is older than [b], zero when they are
+/// equal, and a positive number when [a] is newer. Missing segments are treated
+/// as zero, so `1.2` and `1.2.0` are equal.
 int compareVersions(String a, String b) {
   final pa = _parseVersionSegments(a);
   final pb = _parseVersionSegments(b);
