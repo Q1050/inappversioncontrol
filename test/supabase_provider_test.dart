@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_version_control/in_app_version_control.dart';
-import 'package:in_app_version_control/src/supabase_provider.dart';
 
 void main() {
   test('supabase provider identifies itself as a supabase backend', () {
@@ -70,11 +69,68 @@ void main() {
 
     expect(rule.latestVersion, '1.3.0');
   });
+
+  test('supabase provider forwards custom schema and column names', () async {
+    final fakeClient = _FakeSupabaseTableClient(
+      rows: const [
+        {
+          'application': 'com.example.app',
+          'runtime': 'web',
+          'stage': 'staging',
+          'minVersion': '1.0.0',
+          'latestVersion': '1.1.0',
+        },
+      ],
+    );
+    final provider = SupabaseVersionRuleProvider.client(
+      client: fakeClient,
+      table: 'release_rules',
+      schema: 'mobile',
+      appIdColumn: 'application',
+      platformColumn: 'runtime',
+      environmentColumn: 'stage',
+      selectColumns: 'minVersion,latestVersion',
+    );
+
+    await provider.fetchRuleForEnvironment(
+      appId: 'com.example.app',
+      platform: AppPlatform.web,
+      environment: AppEnvironment.staging,
+    );
+
+    expect(fakeClient.lastTable, 'release_rules');
+    expect(fakeClient.lastSchema, 'mobile');
+    expect(fakeClient.lastSelectColumns, 'minVersion,latestVersion');
+  });
+
+  test('supabase provider wraps query failures', () async {
+    final provider = SupabaseVersionRuleProvider.client(
+      client: _ThrowingSupabaseTableClient(),
+      table: 'app_version_rules',
+    );
+
+    expect(
+      () => provider.fetchRule(
+        appId: 'com.example.app',
+        platform: AppPlatform.android,
+      ),
+      throwsA(
+        isA<SupabaseVersionRuleException>().having(
+          (error) => error.message,
+          'message',
+          contains('Failed to fetch'),
+        ),
+      ),
+    );
+  });
 }
 
 class _FakeSupabaseTableClient implements SupabaseTableClient {
   final List<Map<String, dynamic>> rows;
   Map<String, Object>? lastFilters;
+  String? lastTable;
+  String? lastSchema;
+  String? lastSelectColumns;
 
   _FakeSupabaseTableClient({required this.rows});
 
@@ -85,9 +141,24 @@ class _FakeSupabaseTableClient implements SupabaseTableClient {
     required String selectColumns,
     required Map<String, Object> filters,
   }) async {
+    lastTable = table;
+    lastSchema = schema;
+    lastSelectColumns = selectColumns;
     lastFilters = Map<String, Object>.from(filters);
     return rows.firstWhere(
       (row) => filters.entries.every((entry) => row[entry.key] == entry.value),
     );
+  }
+}
+
+class _ThrowingSupabaseTableClient implements SupabaseTableClient {
+  @override
+  Future<Map<String, dynamic>> fetchSingleRow({
+    required String table,
+    required String? schema,
+    required String selectColumns,
+    required Map<String, Object> filters,
+  }) async {
+    throw StateError('offline');
   }
 }

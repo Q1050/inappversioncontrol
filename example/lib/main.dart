@@ -101,6 +101,10 @@ class _VersionControlExamplePageState extends State<VersionControlExamplePage> {
             },
             shouldFetchAndActivate: false,
           ),
+        _ProviderMode.supabaseMock => SupabaseVersionRuleProvider.client(
+          client: _ExampleSupabaseTableClient(_scenario.rule),
+          table: 'app_version_rules',
+        ),
       },
     );
   }
@@ -150,6 +154,13 @@ class _VersionControlExamplePageState extends State<VersionControlExamplePage> {
             const Text(
               'This uses the real FirebaseVersionRuleProvider API with a '
               'mocked Remote Config client so you can test the Firebase flow locally.',
+            ),
+          ],
+          if (_providerMode == _ProviderMode.supabaseMock) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'This uses the real SupabaseVersionRuleProvider API with a '
+              'mocked table client so you can test the Supabase flow locally.',
             ),
           ],
           const SizedBox(height: 24),
@@ -296,6 +307,27 @@ class _ExampleFirebaseRemoteConfigClient implements FirebaseRemoteConfigClient {
 
   String _encodeRule(VersionRule rule) {
     return jsonEncode(rule.toJson());
+  }
+}
+
+class _ExampleSupabaseTableClient implements SupabaseTableClient {
+  final VersionRule rule;
+
+  const _ExampleSupabaseTableClient(this.rule);
+
+  @override
+  Future<Map<String, dynamic>> fetchSingleRow({
+    required String table,
+    required String? schema,
+    required String selectColumns,
+    required Map<String, Object> filters,
+  }) async {
+    return {
+      ...rule.toJson(),
+      'app_id': filters['app_id'],
+      'platform': filters['platform'],
+      'environment': filters['environment'],
+    };
   }
 }
 
@@ -480,7 +512,8 @@ enum _Scenario {
 
 enum _ProviderMode {
   memory(label: 'In-memory provider'),
-  firebaseMock(label: 'Firebase Remote Config (mock)');
+  firebaseMock(label: 'Firebase Remote Config (mock)'),
+  supabaseMock(label: 'Supabase (mock)');
 
   final String label;
 

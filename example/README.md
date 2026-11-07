@@ -16,8 +16,9 @@ It demonstrates:
 - `UpdateType.maintenance`
 - in-memory provider flow
 - Firebase Remote Config provider flow with a mocked Remote Config client
+- Supabase provider flow with a mocked table client
 - opt-in lifecycle rechecking after a genuine foreground resume
 
-The example uses the real `FirebaseVersionRuleProvider` API with a local mock
-client, so it runs without Firebase credentials. Follow the package README to
-connect a consuming application to its own Firebase project.
+The example uses the real Firebase and Supabase provider APIs with local mock
+clients, so it runs without backend credentials. Follow the package README to
+connect a consuming application to its own backend project.

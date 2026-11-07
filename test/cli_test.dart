@@ -315,6 +315,127 @@ void main() {
     expect(runner.calls.length, 5);
   });
 
+  test('app:supabase configure initializes and writes a migration', () async {
+    final tempDir = await Directory.systemTemp.createTemp('iavc-supabase');
+    addTearDown(() async {
+      if (await tempDir.exists()) await tempDir.delete(recursive: true);
+    });
+    final runner = _FakeProcessRunner([
+      _ProcessCall(
+        executable: 'supabase',
+        args: const ['--version'],
+        result: const IavcCommandResult(
+          exitCode: 0,
+          stdout: '3.0.0',
+          stderr: '',
+        ),
+      ),
+      _ProcessCall(
+        executable: 'supabase',
+        args: const ['init'],
+        result: const IavcCommandResult(exitCode: 0, stdout: '', stderr: ''),
+      ),
+    ]);
+    final out = StringBuffer();
+    final err = StringBuffer();
+
+    final exitCode = await runIavc(
+      ['app:supabase', 'configure', '--out-dir', tempDir.path],
+      out: out,
+      err: err,
+      processRunner: runner,
+      workingDirectory: tempDir.path,
+    );
+
+    final migrations = Directory(
+      '${tempDir.path}/supabase/migrations',
+    ).listSync().whereType<File>().toList();
+    expect(exitCode, 0);
+    expect(err.toString(), isEmpty);
+    expect(out.toString(), contains('Supabase version-rule setup completed.'));
+    expect(migrations, hasLength(1));
+    expect(
+      await migrations.single.readAsString(),
+      allOf(
+        contains('create table if not exists public.app_version_rules'),
+        contains('enable row level security'),
+        contains('grant select'),
+      ),
+    );
+    expect(runner.calls, hasLength(2));
+  });
+
+  test('app:supabase configure can deploy to a linked project', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'iavc-supabase-deploy',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) await tempDir.delete(recursive: true);
+    });
+    final supabaseDir = Directory('${tempDir.path}/supabase');
+    await supabaseDir.create(recursive: true);
+    await File(
+      '${supabaseDir.path}/config.toml',
+    ).writeAsString('project_id="x"');
+    final runner = _FakeProcessRunner([
+      _ProcessCall(
+        executable: 'supabase',
+        args: const ['--version'],
+        result: const IavcCommandResult(
+          exitCode: 0,
+          stdout: '3.0.0',
+          stderr: '',
+        ),
+      ),
+      _ProcessCall(
+        executable: 'supabase',
+        args: const ['db', 'push', '--linked', '--yes'],
+        result: const IavcCommandResult(exitCode: 0, stdout: '', stderr: ''),
+      ),
+    ]);
+    final out = StringBuffer();
+    final err = StringBuffer();
+
+    final exitCode = await runIavc(
+      [
+        'app:supabase',
+        'configure',
+        '--out-dir',
+        tempDir.path,
+        '--schema',
+        'mobile',
+        '--table',
+        'release_rules',
+        '--deploy',
+        'true',
+      ],
+      out: out,
+      err: err,
+      processRunner: runner,
+      workingDirectory: tempDir.path,
+    );
+
+    expect(exitCode, 0);
+    expect(err.toString(), isEmpty);
+    expect(out.toString(), contains('Migration deployed'));
+    expect(runner.calls, hasLength(2));
+  });
+
+  test('app:supabase configure explains when the CLI is missing', () async {
+    final out = StringBuffer();
+    final err = StringBuffer();
+
+    final exitCode = await runIavc(
+      ['app:supabase', 'configure'],
+      out: out,
+      err: err,
+      processRunner: _MissingExecutableProcessRunner(),
+    );
+
+    expect(exitCode, 1);
+    expect(err.toString(), contains('Supabase CLI is not available'));
+  });
+
   test('help prints available commands', () async {
     final out = StringBuffer();
     final err = StringBuffer();
@@ -323,6 +444,7 @@ void main() {
     expect(exitCode, 0);
     expect(out.toString(), contains('iavc commands:'));
     expect(out.toString(), contains('rule:validate'));
+    expect(out.toString(), contains('app:supabase'));
     expect(err.toString(), isEmpty);
   });
 }
@@ -365,4 +487,16 @@ class _ProcessCall {
     required this.args,
     required this.result,
   });
+}
+
+class _MissingExecutableProcessRunner implements IavcProcessRunner {
+  @override
+  Future<IavcCommandResult> run(
+    String executable,
+    List<String> args, {
+    required String workingDirectory,
+    Map<String, String>? environment,
+  }) {
+    throw ProcessException(executable, args, 'not found');
+  }
 }

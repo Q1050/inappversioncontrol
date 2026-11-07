@@ -1,3 +1,13 @@
+## 0.0.5
+
+* Added the public `SupabaseVersionRuleProvider` with environment, platform,
+  custom schema, custom column, and custom row-mapping support.
+* Added `iavc app:supabase configure` to initialize Supabase, generate a
+  read-only version-rule migration, and optionally deploy it to a linked project.
+* Added Supabase provider and CLI tests plus a credential-free example flow.
+* Reworked the README opening with a faster quick start and complete Firebase,
+  Supabase, and custom-backend setup guidance.
+
 ## 0.0.4
 
 * Added opt-in lifecycle-aware policy checks with one recheck per genuine app

@@ -1,68 +1,83 @@
-`in_app_version_control` is a Flutter/Dart package for backend-driven app
-version governance. It fetches a version rule from your backend and decides
-whether the app should continue normally, suggest an update, force an update,
-or enter maintenance mode.
+# In App Version Control
 
-## Features
+Control Flutter app updates and maintenance remotely, without waiting for a new
+store release.
 
-- Backend-agnostic decision engine
-- Optional update, forced update, and maintenance mode support
-- Pluggable provider interface for Firebase Remote Config or custom servers
-- Built-in endpoint provider for teams that already expose their own backend API
-- Enum-backed backend source selection through provider types
+`in_app_version_control` reads version rules from Firebase Remote Config,
+Supabase, or your existing HTTP API and tells your app whether to continue
+normally, suggest an update, require an update, or enter maintenance mode.
 
-## Install in a Flutter project
+## Why use it?
 
-Install the latest published version from pub.dev:
+- **Protect outdated releases:** require an update when an old version is no
+  longer safe or supported.
+- **Announce new releases:** offer an optional update without blocking users.
+- **Enable maintenance mode:** temporarily prevent normal app use from your
+  backend.
+- **React when users return:** optionally check the policy again after the app
+  resumes.
+- **Keep your backend:** use Firebase Remote Config, Supabase, a REST endpoint,
+  or your own `VersionRuleProvider`.
+
+## Quick start
+
+Install the package from pub.dev:
 
 ```bash
 flutter pub add in_app_version_control
 ```
 
-Or add the dependency to the consuming app's `pubspec.yaml`:
-
-```yaml
-dependencies:
-  in_app_version_control: ^0.0.4
-```
-
-Then install dependencies:
-
-```bash
-flutter pub get
-```
-
-Import the public package API wherever version checks are needed:
+Point the built-in endpoint provider at your existing version-policy API:
 
 ```dart
 import 'package:in_app_version_control/in_app_version_control.dart';
-```
 
-For Firebase Remote Config, also add Firebase Core and configure Firebase for
-the consuming app. Firebase configuration files are intentionally not included
-in this repository because every app must use its own Firebase project.
-
-```bash
-flutter pub add firebase_core
-dart pub global activate flutterfire_cli
-flutterfire configure
-```
-
-Initialize Firebase before creating a `FirebaseVersionRuleProvider`:
-
-```dart
-import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/widgets.dart';
-import 'firebase_options.dart';
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+Future<void> checkVersion() async {
+  final provider = EndpointVersionRuleProvider(
+    endpoint: Uri.parse('https://api.example.com/version-rule'),
   );
-  runApp(const MyApp());
+  final versionControl = InAppVersionControl(provider: provider);
+
+  final decision = await versionControl.check(
+    appId: 'com.example.app',
+    currentVersion: '1.4.0',
+  );
+
+  switch (decision.type) {
+    case UpdateType.none:
+      print('Continue into the app.');
+      break;
+    case UpdateType.optional:
+      print('Offer the update without blocking the user.');
+      break;
+    case UpdateType.force:
+      print('Require an update before continuing.');
+      break;
+    case UpdateType.maintenance:
+      print('Show the maintenance screen.');
+      break;
+  }
+
+  provider.close();
 }
 ```
+
+Your endpoint returns one small JSON rule:
+
+```json
+{
+  "minVersion": "1.3.0",
+  "latestVersion": "1.5.0",
+  "storeUrl": "https://example.com/store",
+  "message": "A new version is available.",
+  "maintenance": false
+}
+```
+
+Prefer Firebase? Jump to [Firebase Remote Config](#4-use-firebase-remote-config).
+Prefer Supabase? Jump to [Supabase](#5-use-supabase).
+For existing backend contracts, see
+[custom response mapping](#3-map-an-existing-backend-response).
 
 ## Getting started
 
@@ -82,6 +97,7 @@ Use the built-in platform enum values instead of raw strings:
 Backend source is a separate enum exposed by each provider:
 
 - `BackendService.firebase`
+- `BackendService.supabase`
 - `BackendService.custom`
 
 Rules can be separated by deployment environment:
@@ -253,10 +269,22 @@ final provider = EndpointVersionRuleProvider(
 
 ### 4. Use Firebase Remote Config
 
-Configure the consuming app with FlutterFire and initialize Firebase before
+Add Firebase Core and configure the consuming app with FlutterFire:
+
+```bash
+flutter pub add firebase_core
+dart pub global activate flutterfire_cli
+flutterfire configure
+```
+
+Firebase configuration files are intentionally not included in this repository
+because every app must use its own Firebase project. Initialize Firebase before
 creating the provider:
 
 ```dart
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
 await Firebase.initializeApp(
   options: DefaultFirebaseOptions.currentPlatform,
 );
@@ -297,7 +325,81 @@ Each Remote Config key should store a JSON rule payload like:
 }
 ```
 
-### 5. Restrict rules to specific runtimes
+### 5. Use Supabase
+
+Initialize Supabase in the consuming app using its project URL and publishable
+key. Never place a Supabase service-role key in a Flutter application.
+
+```bash
+flutter pub add supabase_flutter
+```
+
+```dart
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+await Supabase.initialize(
+  url: 'YOUR_SUPABASE_URL',
+  publishableKey: 'YOUR_SUPABASE_PUBLISHABLE_KEY',
+);
+```
+
+Create the version-rule table and its read-only Row Level Security policy with
+the package CLI:
+
+```bash
+dart run in_app_version_control:iavc app:supabase configure
+supabase link --project-ref YOUR_PROJECT_REF
+supabase db push --linked --yes
+```
+
+Alternatively, add `--deploy true` after the project is linked to create and
+deploy the migration in one command.
+
+Then use the built-in provider:
+
+```dart
+final versionControl = InAppVersionControl(
+  provider: SupabaseVersionRuleProvider(
+    table: 'app_version_rules',
+  ),
+);
+
+final decision = await versionControl.check(
+  appId: 'com.example.app',
+  currentVersion: '1.1.0',
+);
+```
+
+Store one row for each app, platform, and environment. For example:
+
+```sql
+insert into public.app_version_rules (
+  app_id,
+  platform,
+  environment,
+  "minVersion",
+  "latestVersion",
+  "storeUrl",
+  message
+) values (
+  'com.example.app',
+  'android',
+  'production',
+  '1.0.0',
+  '1.2.0',
+  'https://play.google.com/store/apps/details?id=com.example.app',
+  'A new version is available.'
+);
+```
+
+The generated policy allows signed-in and signed-out app clients to read rules,
+but it grants them no write access. Manage rules from the Supabase dashboard,
+your trusted backend, or another controlled deployment workflow.
+
+Custom schemas, table names, column names, selected columns, and row mapping are
+supported through the `SupabaseVersionRuleProvider` constructor.
+
+### 6. Restrict rules to specific runtimes
 
 If a rule should only apply to certain app runtimes, set
 `supportedPlatforms`:
@@ -310,7 +412,7 @@ const rule = VersionRule(
 );
 ```
 
-### 6. Inspect the provider backend type
+### 7. Inspect the provider backend type
 
 ```dart
 final backend = versionControl.backendService;
@@ -350,6 +452,8 @@ dart run in_app_version_control:iavc rule:validate path/to/rule.json
 dart run in_app_version_control:iavc endpoint:test https://api.example.com/version-rule --method post --platform android
 dart run in_app_version_control:iavc app:firebase configure --mode remote-config
 dart run in_app_version_control:iavc app:firebase configure --project your-project-id --android-package com.example.app --write-alias default --deploy-remoteconfig true
+dart run in_app_version_control:iavc app:supabase configure --table app_version_rules --schema public
+dart run in_app_version_control:iavc app:supabase configure --deploy true
 dart run in_app_version_control:iavc app:custom configure --method post
 ```
 
@@ -359,3 +463,7 @@ FlutterFire-generated `firebase.json`. It also reads the Android package name
 from `android/app/build.gradle.kts` or `android/app/build.gradle`. Use
 `--project` or `--android-package` only when detection is unavailable or you
 want to override it.
+
+`app:supabase configure` verifies the Supabase CLI, initializes Supabase locally
+when needed, and writes a database migration under `supabase/migrations/`. With
+`--deploy true`, it also pushes the migration to the linked Supabase project.
